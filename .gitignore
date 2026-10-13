@@ -1,0 +1,17 @@
+# Compiled binaries
+/rate-limiter
+
+# Test coverage files
+coverage.out
+coverage.html
+
+# Environment variables and secrets
+.env
+.env.*
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
