@@ -1,0 +1,100 @@
+
+services:
+
+  # ==========================================
+  # 1. REDIS
+  # ==========================================
+  redis:
+    image: redis:8.6.3-alpine3.23
+    container_name: rate-limiter-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - rate-limit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================
+  # 2. GO RATE LIMIT SERVICE
+  # ==========================================
+  rate-limiter:
+    build:
+      context: ./rate-limiter
+      dockerfile: Dockerfile
+    container_name: rate-limiter-service
+    environment:
+      REDIS_ADDR: redis:6379
+      RLS_ADDR: :8081
+      RATE_LIMIT_DOMAIN: backend-api
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - rate-limit-network
+    restart: unless-stopped
+
+  # ==========================================
+  # 3. NODE.JS BACKEND
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: node-backend
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+    networks:
+      - rate-limit-network
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # ==========================================
+  # 4. ENVOY GATEWAY
+  # ==========================================
+  envoy:
+    image: envoyproxy/envoy:v1.40-latest
+    container_name: rate-limit-envoy
+    command:
+      - -c
+      - /etc/envoy/envoy.yaml
+      - --log-level
+      - info
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    depends_on:
+      rate-limiter:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    networks:
+      - rate-limit-network
+    restart: unless-stopped
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  rate-limit-network:
+    driver: bridge
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  redis_data:
