@@ -1,5 +1,25 @@
 # Rate Limiter
 
+## Quick Start (Docker Compose)
+
+The whole setup can be run from the root `docker-compose.yaml`:
+
+```bash
+docker compose up --build -d
+```
+
+The rate limiter is configured through environment variables in `docker-compose.yaml`:
+
+```yaml
+RATE_LIMIT_LIMIT: 5              # max requests allowed per window
+RATE_LIMIT_WINDOW: 1m            # window size
+RATE_LIMIT_BLOCK_DURATION: 30s   # how long a client stays blocked after exceeding the limit
+```
+
+After changing these values, re-run `docker compose up --build -d` to apply them.
+
+The sections below describe running each component manually.
+
 ## Run Redis
 
 ```bash

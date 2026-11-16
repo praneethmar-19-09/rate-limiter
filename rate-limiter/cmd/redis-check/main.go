@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -84,5 +83,3 @@ func main() {
 
 	fmt.Println("Block key:", blockKey)
 }
-
-

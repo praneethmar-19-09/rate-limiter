@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -9,13 +8,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/praneethm/rate-limiter/internal/config"
 	"github.com/praneethm/rate-limiter/internal/envoyrls"
 	"github.com/praneethm/rate-limiter/internal/ratelimit"
 	"github.com/praneethm/rate-limiter/internal/redisstore"
 )
 
 func main() {
-	// 1. Create a context that listens for termination signals.
+	// 1. Load application configuration.
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// 2. Create a context that listens for termination signals.
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -23,29 +29,29 @@ func main() {
 	)
 	defer stop()
 
-	// 2. Configure Redis.
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-
+	// 3. Configure and connect to Redis.
 	redisCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 
-	redisClient, err := redisstore.NewClient(redisCtx, redisstore.Config{
-		Addr: redisAddr,
-	})
+	redisClient, err := redisstore.NewClient(
+		redisCtx,
+		redisstore.Config{
+			Addr: cfg.RedisAddr,
+		},
+	)
+
+	cancel()
+
 	if err != nil {
 		log.Fatalf("Redis initialization failed: %v", err)
 	}
 	defer redisClient.Close()
 
-	log.Println("Connected to Redis:", redisAddr)
+	log.Println("Connected to Redis:", cfg.RedisAddr)
 
-	// 3. Create the Redis key builder.
+	// 4. Create the Redis key builder.
 	keyBuilder := redisstore.NewKeyBuilder("ratelimit")
 
-	// 4. Create the Redis-backed limiter.
+	// 5. Create the Redis-backed limiter.
 	limiter, err := redisstore.NewRedisFixedWindowLimiter(
 		redisClient,
 		keyBuilder,
@@ -54,41 +60,32 @@ func main() {
 		log.Fatalf("Failed to create rate limiter: %v", err)
 	}
 
-	// 5. Configure the rate-limit policy.
+	// 6. Configure the rate-limit policy.
 	policy := ratelimit.Policy{
-		Limit:         5,
-		Window:        time.Minute,
-		BlockDuration: 30 * time.Second,
+		Limit:         cfg.RateLimitLimit,
+		Window:        cfg.RateLimitWindow,
+		BlockDuration: cfg.RateLimitBlockDuration,
 	}
 
-	// 6. Create the Envoy RLS handler.
-	domain := os.Getenv("RATE_LIMIT_DOMAIN")
-	if domain == "" {
-		domain = "backend-api"
-	}
-
+	// 7. Create the Envoy RLS handler.
 	handler, err := envoyrls.NewHandler(
 		limiter,
-		domain,
+		cfg.RateLimitDomain,
 		policy,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create Envoy RLS handler: %v", err)
 	}
 
-	// 7. Start the gRPC server.
-	serverAddr := os.Getenv("RLS_ADDR")
-	if serverAddr == "" {
-		serverAddr = ":8081"
-	}
-
-	server, err := envoyrls.NewServer(serverAddr, handler)
+	// 8. Create the gRPC server.
+	server, err := envoyrls.NewServer(cfg.RLSAddr, handler)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC server: %v", err)
 	}
 
-	log.Println("Envoy Rate Limit Service listening on", serverAddr)
-	log.Println("Rate-limit domain:", domain)
+	log.Println("Envoy Rate Limit Service listening on", cfg.RLSAddr)
+	log.Println("Rate-limit domain:", cfg.RateLimitDomain)
+
 	log.Printf(
 		"Policy: limit=%d, window=%s, block=%s",
 		policy.Limit,
@@ -96,7 +93,7 @@ func main() {
 		policy.BlockDuration,
 	)
 
-	// 8. Serve gRPC requests.
+	// 9. Serve gRPC requests.
 	serverErr := make(chan error, 1)
 
 	go func() {

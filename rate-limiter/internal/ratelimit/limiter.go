@@ -4,7 +4,7 @@ import "context"
 
 type Limiter interface {
 	Allow(
-		ctx context.Context, 
+		ctx context.Context,
 		key string,
 		policy Policy) (Decision, error)
 }

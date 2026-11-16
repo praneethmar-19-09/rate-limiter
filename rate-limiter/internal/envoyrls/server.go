@@ -1,6 +1,5 @@
 // server.go will implement the official gRPC interface
 
-
 package envoyrls
 
 import (

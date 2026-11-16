@@ -31,6 +31,10 @@ services:
       REDIS_ADDR: redis:6379
       RLS_ADDR: :8081
       RATE_LIMIT_DOMAIN: backend-api
+      RATE_LIMIT_LIMIT: 5
+      RATE_LIMIT_WINDOW: 1m
+      RATE_LIMIT_BLOCK_DURATION: 30s
+      
     depends_on:
       redis:
         condition: service_healthy

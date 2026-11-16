@@ -1,11 +1,11 @@
 // handler.go will translate Envoy's descriptors into inputs for your existing limiter.
 
-
 package envoyrls
 
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v3"
 	"github.com/praneethm/rate-limiter/internal/ratelimit"
@@ -74,6 +74,7 @@ func (h *Handler) ShouldRateLimit(
 		return nil, status.Error(codes.InvalidArgument, "invalid rate-limit descriptor")
 	}
 
+	log.Printf("Rate-limit request received for client IP: %s", clientIP)
 	decision, err := h.limiter.Allow(ctx, clientIP, h.policy)
 	if err != nil {
 		return nil, status.Error(
