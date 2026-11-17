@@ -15,13 +15,18 @@ type Config struct {
 	RateLimitLimit         int64
 	RateLimitWindow        time.Duration
 	RateLimitBlockDuration time.Duration
+
+	RedisPoolSize     int
+	RedisMinIdleConns int
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		RedisAddr:       getEnv("REDIS_ADDR", "localhost:6379"),
-		RLSAddr:         getEnv("RLS_ADDR", ":8081"),
-		RateLimitDomain: getEnv("RATE_LIMIT_DOMAIN", "backend-api"),
+		RedisAddr:         getEnv("REDIS_ADDR", "localhost:6379"),
+		RLSAddr:           getEnv("RLS_ADDR", ":8081"),
+		RateLimitDomain:   getEnv("RATE_LIMIT_DOMAIN", "backend-api"),
+		RedisPoolSize:     getEnvAsInt("REDIS_POOL_SIZE", 20),
+		RedisMinIdleConns: getEnvAsInt("REDIS_MIN_IDLE_CONNS", 0),
 	}
 
 	limit, err := strconv.ParseInt(
@@ -58,4 +63,16 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 0 {
+		return fallback
+	}
+	return n
 }

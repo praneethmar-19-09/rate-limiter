@@ -35,18 +35,41 @@ func main() {
 	redisClient, err := redisstore.NewClient(
 		redisCtx,
 		redisstore.Config{
-			Addr: cfg.RedisAddr,
+			Addr:         cfg.RedisAddr,
+			PoolSize:     cfg.RedisPoolSize,
+			MinIdleConns: cfg.RedisMinIdleConns,
 		},
 	)
-
 	cancel()
-
 	if err != nil {
 		log.Fatalf("Redis initialization failed: %v", err)
 	}
 	defer redisClient.Close()
 
 	log.Println("Connected to Redis:", cfg.RedisAddr)
+
+	// Periodically log Redis pool statistics.
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				stats := redisClient.PoolStats()
+				log.Printf(
+					"Redis pool: total=%d idle=%d stale=%d hits=%d misses=%d timeouts=%d",
+					stats.TotalConns,
+					stats.IdleConns,
+					stats.StaleConns,
+					stats.Hits,
+					stats.Misses,
+					stats.Timeouts,
+				)
+			}
+		}
+	}()
 
 	// 4. Create the Redis key builder.
 	keyBuilder := redisstore.NewKeyBuilder("ratelimit")

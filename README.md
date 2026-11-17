@@ -18,6 +18,8 @@ RATE_LIMIT_BLOCK_DURATION: 30s   # how long a client stays blocked after exceedi
 
 After changing these values, re-run `docker compose up --build -d` to apply them.
 
+Redis Insight is available in the browser at http://localhost:5540. On first use, add a database with host `redis` and port `6379` (the Compose service name, since Insight runs in the same Docker network).
+
 The sections below describe running each component manually.
 
 ## Run Redis

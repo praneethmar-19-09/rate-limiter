@@ -14,9 +14,13 @@ type Config struct {
 	Username     string
 	Password     string
 	DB           int
+
 	DialTimeout  time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
+
+	PoolSize     int
+	MinIdleConns int
 }
 
 // NewClient creates and initializes a Redis client.
@@ -38,14 +42,32 @@ func NewClient(ctx context.Context, cfg Config) (*redis.Client, error) {
 		cfg.WriteTimeout = 3 * time.Second
 	}
 
+	if cfg.PoolSize <= 0 {
+		cfg.PoolSize = 20
+	}
+
+	if cfg.MinIdleConns < 0 {
+		cfg.MinIdleConns = 0
+	}
+
+	if cfg.MinIdleConns > cfg.PoolSize {
+		return nil, fmt.Errorf(
+			"MinIdleConns cannot exceed PoolSize",
+		)
+	}
+
 	client := redis.NewClient(&redis.Options{
 		Addr:         cfg.Addr,
 		Username:     cfg.Username,
 		Password:     cfg.Password,
 		DB:           cfg.DB,
+
 		DialTimeout:  cfg.DialTimeout,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
+		
+		PoolSize:     cfg.PoolSize,
+		MinIdleConns: cfg.MinIdleConns,
 	})
 
 	// Verify that Redis is reachable.
